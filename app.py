@@ -5,13 +5,17 @@ from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
 from backend import run_travel_agent
-
+from fastapi import UploadFile, File, HTTPException
+from tools.travel_rag import ingest_pdf_bytes, generate_travel_answer
 
 from exception import (
     TravelAgentException,
     travel_agent_exception_handler
 )
 
+
+class RAGQuestion(BaseModel):
+    question: str
 
 BASE_DIR=Path(__file__).resolve().parent
 
@@ -75,6 +79,94 @@ async def travel_planner(request_data:TravelRequest):
             }
         )
 
+@app.post("/rag/upload")
+async def upload_travel_pdf(file:UploadFile=File(...)):
+
+    if not file.filename or not file.filename.lower().endswith(".pdf"):
+        raise HTTPException(
+            status_code=400,
+            detail="On;y PDF files allowed"
+        )
+
+    pdf_bytes= await file.read()
+
+    if len(pdf_bytes)>15*1024*1024: #15 mb
+
+        raise HTTPException(
+            status_code=413,
+            detail="PDF file cannot exceed 15 MB"
+        )
+
+    try:
+        chunks_stored=ingest_pdf_bytes(
+            pdf_bytes=pdf_bytes,
+            filename=file.filename
+        )
+        return{
+            "success": True,
+            "filename": file.filename,
+            "chunks_stored": chunks_stored,
+            "message": "PDF successfully ingested into travel knowledge base."
+        }
+    except Exception as e:
+        traceback.print_exc()
+
+        raise HTTPException(
+            status_code=500,
+            detail=f" PDF ingestion failed:{str(e)}"
+        )
+
+
+@app.post("/rag/ask")
+async def ask_travel_questions(request_data: RAGQuestion):
+
+    question=request_data.question.strip()
+
+    if not question:
+        return JSONResponse(
+            status_code=400,
+            content={
+                "seccess":False,
+                "error":"Question cannot be empty."
+            }
+        )
+
+    try:
+        answer=generate_travel_answer(question)
+        return JSONResponse(
+            content={
+                "success":True,
+                "question":question,
+                "answer":answer
+            }
+        )
+
+    except Exception as e:
+        print("RAG ERROR:",e)
+        traceback.print_exc()
+
+        return JSONResponse(
+            status_code=500,
+            content={
+                "success":False,
+                "error":str(e)
+            }
+        )
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 @app.get("/health")
@@ -88,6 +180,7 @@ async def health_check():
 @app.get("/favicon.ico")
 async def favicon():
     return JSONResponse(content={})
+
 
 
 

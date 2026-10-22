@@ -21,6 +21,7 @@ from langchain_core.messages import(
 from langchain_groq import ChatGroq
 from tools.tavily_tool import tavily_search
 from tools.flight_tool import search_flights
+from tools.travel_rag import get_travel_context
 
 def get_db_connection():
     return mysql.connector.connect(
@@ -88,13 +89,50 @@ def hotel_agent(state:TravelState):
 # Itinerary Agent
 
 
-def itinerary_agent(state:TravelState):
-    prompt=f"""
+# def itinerary_agent(state:TravelState):
+#     prompt=f"""
 
-create a complete travel itinerary.
+# create a complete travel itinerary.
+
+# User Query:
+# {state['user_query']}
+
+# Flight Results:
+# {state['flight_results']}
+
+# Hotel Results:
+# {state['hotel_results']}
+
+
+# make the itineary practical, budget-aware and easy to follow
+
+# """
+
+
+#     response=llm.invoke([
+#         SystemMessage(content="You are an expert travel planner"),
+#         HumanMessage(content=prompt)
+#     ])
+
+#     return{
+#         "itinerary":response.content,
+#         "messages":[response],
+#         "llm_calls":state.get("llm_calls",0)+1
+#     }
+
+
+def itinerary_agent(state: TravelState):
+
+    query = state["user_query"]
+
+    # Retrieve relevant travel knowledge from Qdrant
+    travel_context = get_travel_context(query, limit=3)
+
+    prompt = f"""
+Create a complete travel itinerary.
 
 User Query:
-{state['user_query']}
+{query}
 
 Flight Results:
 {state['flight_results']}
@@ -102,23 +140,32 @@ Flight Results:
 Hotel Results:
 {state['hotel_results']}
 
+Travel Guide Knowledge Retrieved from Qdrant:
+{travel_context}
 
-make the itineary practical, budget-aware and easy to follow
-
+Instructions:
+- Make the itinerary practical, budget-aware and easy to follow.
+- Use the retrieved travel-guide knowledge when it is relevant.
+- Do not claim that information came from a travel guide
+  unless it is present in the retrieved context.
+- If the retrieved context does not contain enough information,
+  do not invent facts or pretend the guide provided them.
+- Consider flight and hotel information when planning the itinerary.
 """
 
-
-    response=llm.invoke([
-        SystemMessage(content="You are an expert travel planner"),
+    response = llm.invoke([
+        SystemMessage(
+            content="You are an expert travel planner. "
+            "Use retrieved travel knowledge as supporting context."
+        ),
         HumanMessage(content=prompt)
     ])
 
-    return{
-        "itinerary":response.content,
-        "messages":[response],
-        "llm_calls":state.get("llm_calls",0)+1
+    return {
+        "itinerary": response.content,
+        "messages": [response],
+        "llm_calls": state.get("llm_calls", 0) + 1
     }
-
 
 def final_agent(state:TravelState):
     final_prompt=f"""
@@ -161,6 +208,7 @@ Important
     ])
 
     return{
+        "itinerary": response.content,
         "messages":[response],
         "llm_calls":state.get("llm_calls",0)+1
     }
