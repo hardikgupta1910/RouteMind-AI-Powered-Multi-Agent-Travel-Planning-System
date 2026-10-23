@@ -1,3 +1,4 @@
+import asyncio
 import os
 import mysql.connector
 from dotenv import load_dotenv
@@ -11,17 +12,27 @@ import uuid
 from urllib.parse import urlparse, unquote
 import pymysql
 from langgraph.graph import StateGraph, START,END
+from contextlib import asynccontextmanager
 from langgraph.checkpoint.mysql.pymysql import PyMySQLSaver
+from urllib.parse import urlparse, unquote
 from langchain_core.messages import(
     AnyMessage,
     HumanMessage,
     AIMessage,
     SystemMessage
 )
+import asyncio
 from langchain_groq import ChatGroq
-from tools.tavily_tool import tavily_search
+# from tools.tavily_tool import tavily_search
+from tools.mcp_test import tavily_mcp_search
 from tools.flight_tool import search_flights
 from tools.travel_rag import get_travel_context
+
+
+DB_URI = os.getenv("DB_URI")
+
+if not DB_URI:
+    raise ValueError("DB_URI is missing from your .env file")
 
 def get_db_connection():
     return mysql.connector.connect(
@@ -73,53 +84,33 @@ def flight_agent(state:TravelState):
 
 #Hotel agent
 
-def hotel_agent(state:TravelState):
-    query=f"Best hotels for {state['user_query']}"
-    hotel_results=tavily_search(query)
-
-    return{
-        "hotel_results":hotel_results,
-        "messages":[
-            AIMessage(content="Hotels information fetched.")
-        ],
-        "llm_calls":state.get("llm_calls",0)+1 
-    }
-
-
-# Itinerary Agent
-
-
-# def itinerary_agent(state:TravelState):
-#     prompt=f"""
-
-# create a complete travel itinerary.
-
-# User Query:
-# {state['user_query']}
-
-# Flight Results:
-# {state['flight_results']}
-
-# Hotel Results:
-# {state['hotel_results']}
-
-
-# make the itineary practical, budget-aware and easy to follow
-
-# """
-
-
-#     response=llm.invoke([
-#         SystemMessage(content="You are an expert travel planner"),
-#         HumanMessage(content=prompt)
-#     ])
+# async def hotel_agent(state:TravelState):
+#     query=f"Best hotels for {state['user_query']}"
+#     # hotel_results=tavily_search(query)
+#     hotel_results=await tavily_mcp_search(query)
 
 #     return{
-#         "itinerary":response.content,
-#         "messages":[response],
-#         "llm_calls":state.get("llm_calls",0)+1
+#         "hotel_results":hotel_results,
+#         "messages":[
+#             AIMessage(content="Hotels information fetched.")
+#         ],
+#         "llm_calls":state.get("llm_calls",0)+1 
 #     }
 
+def hotel_agent(state: TravelState):
+    query = f"Best hotels for {state['user_query']}"
+
+    hotel_results = asyncio.run(tavily_mcp_search(query))
+
+    return {
+        "hotel_results": hotel_results,
+        "messages": [
+            AIMessage(content="Hotels information fetched.")
+        ],
+        "llm_calls": state.get("llm_calls", 0) + 1
+    }
+
+# Itinerary Agent
 
 def itinerary_agent(state: TravelState):
 
@@ -238,30 +229,106 @@ graph.add_edge("final_agent", END)
 
 
 
-DB_URI = os.getenv("DB_URI")
+# DB_URI = os.getenv("DB_URI")
 
-parsed = urlparse(DB_URI)
+# parsed = urlparse(DB_URI)
 
-conn = pymysql.connect(
-    host=parsed.hostname,
-    port=parsed.port or 3306,
-    user=unquote(parsed.username),
-    password=unquote(parsed.password),
-    database=parsed.path.lstrip("/"),
-    autocommit=True,
-)
+# conn = pymysql.connect(
+#     host=parsed.hostname,
+#     port=parsed.port or 3306,
+#     user=unquote(parsed.username),
+#     password=unquote(parsed.password),
+#     database=parsed.path.lstrip("/"),
+#     autocommit=True,
+# )
 
-checkpointer = PyMySQLSaver(conn)
-checkpointer.setup()
+# checkpointer = PyMySQLSaver(conn)
+# checkpointer.setup()
 
-travel_graph = graph.compile(checkpointer=checkpointer)
+# travel_graph = graph.compile(checkpointer=checkpointer)
 
+
+import pymysql
+from langgraph.checkpoint.mysql.pymysql import PyMySQLSaver
+from urllib.parse import urlparse, unquote
+
+
+def create_checkpointer():
+    parsed = urlparse(DB_URI)
+
+    conn = pymysql.connect(
+        host=parsed.hostname,
+        port=parsed.port or 3306,
+        user=unquote(parsed.username),
+        password=unquote(parsed.password),
+        database=parsed.path.lstrip("/"),
+        autocommit=True,
+    )
+
+    checkpointer = PyMySQLSaver(conn)
+    checkpointer.setup()
+
+    travel_graph = graph.compile(checkpointer=checkpointer)
+
+    return travel_graph
+
+@asynccontextmanager
+async def lifespan(app):
+    global travel_graph
+
+    travel_graph = create_checkpointer()
+
+    print("Travel graph initialized with synchronous MySQL checkpointer")
+
+    yield
 
 # Run Travel Agent
 
-def run_travel_agent(user_input: str, thread_id: str | None = None):
+# async def run_travel_agent(user_input: str, thread_id: str | None = None):
 
-    if not thread_id:
+#     if not thread_id:
+#         thread_id = f"user_{uuid.uuid4().hex}"
+
+#     config = {
+#         "configurable": {
+#             "thread_id": thread_id
+#         }
+#     }
+
+#     result = await travel_graph.invoke(
+#         {
+#             "messages": [
+#                 HumanMessage(content=user_input)
+#             ],
+#             "user_query": user_input,
+#             "flight_results": "",
+#             "hotel_results": "",
+#             "itinerary": "",
+#             "llm_calls": 0
+#         },
+#         config=config
+#     )
+
+#     final_answer = result["messages"][-1].content
+
+#     return {
+#         "thread_id": thread_id,
+#         "answer": final_answer,
+#         "flight_results": result.get("flight_results", ""),
+#         "hotel_results": result.get("hotel_results", ""),
+#         "itinerary": result.get("itinerary", ""),
+#         "llm_calls": result.get("llm_calls", 0),
+#     }
+
+
+
+
+
+async def run_travel_agent(
+    user_input: str,
+    thread_id: str | None = None
+):
+    if not thread_id or thread_id == "string":
         thread_id = f"user_{uuid.uuid4().hex}"
 
     config = {
@@ -270,18 +337,19 @@ def run_travel_agent(user_input: str, thread_id: str | None = None):
         }
     }
 
-    result = travel_graph.invoke(
-        {
-            "messages": [
-                HumanMessage(content=user_input)
-            ],
-            "user_query": user_input,
-            "flight_results": "",
-            "hotel_results": "",
-            "itinerary": "",
-            "llm_calls": 0
-        },
-        config=config
+    initial_state = {
+        "messages": [HumanMessage(content=user_input)],
+        "user_query": user_input,
+        "flight_results": "",
+        "hotel_results": "",
+        "itinerary": "",
+        "llm_calls": 0
+    }
+
+    result = await asyncio.to_thread(
+        travel_graph.invoke,
+        initial_state,
+        config
     )
 
     final_answer = result["messages"][-1].content
@@ -292,5 +360,5 @@ def run_travel_agent(user_input: str, thread_id: str | None = None):
         "flight_results": result.get("flight_results", ""),
         "hotel_results": result.get("hotel_results", ""),
         "itinerary": result.get("itinerary", ""),
-        "llm_calls": result.get("llm_calls", 0),
+        "llm_calls": result.get("llm_calls", 0)
     }

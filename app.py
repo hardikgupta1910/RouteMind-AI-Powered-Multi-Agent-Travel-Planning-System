@@ -1,13 +1,12 @@
 from pathlib import Path
 import traceback
 import uvicorn
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, UploadFile, File, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
-from backend import run_travel_agent
-from fastapi import UploadFile, File, HTTPException
-from tools.travel_rag import ingest_pdf_bytes, generate_travel_answer
 
+from backend import run_travel_agent, lifespan
+from tools.travel_rag import ingest_pdf_bytes, generate_travel_answer
 from exception import (
     TravelAgentException,
     travel_agent_exception_handler
@@ -17,14 +16,18 @@ from exception import (
 class RAGQuestion(BaseModel):
     question: str
 
-BASE_DIR=Path(__file__).resolve().parent
 
-app=FastAPI(
+class TravelRequest(BaseModel):
+    message: str
+    thread_id: str | None = None
+
+
+app = FastAPI(
     title="AI Travel Planning System",
     description="LangGraph Multi-Agent Travel Planner with FastAPI Frontend",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
-
 
 app.add_exception_handler(
     TravelAgentException,
@@ -51,7 +54,7 @@ async def travel_planner(request_data:TravelRequest):
                     "error":"Message cannot be empty."
                 }
             )
-        result=run_travel_agent(
+        result=await run_travel_agent(
             user_input=user_message,
             thread_id=request_data.thread_id
         )

@@ -15,6 +15,8 @@ from dotenv import load_dotenv
 from langchain_groq import ChatGroq
 from langchain_core.messages import SystemMessage, HumanMessage
 
+
+
 load_dotenv()
 
 llm = ChatGroq(
@@ -191,7 +193,7 @@ def ingest_pdf_bytes(pdf_bytes: bytes, filename: str) -> int:
     using the existing shared ingest_text() function.
     """
 
-    reader = PdfReader(BytesIO(pdf_bytes))
+    reader = PdfReader(BytesIO(pdf_bytes)) #It wraps the existing PDF bytes in a file-like object so PdfReader can read them.
 
     # Extract text from all pages
     pages_text = []
@@ -208,10 +210,10 @@ def ingest_pdf_bytes(pdf_bytes: bytes, filename: str) -> int:
             "The PDF may be scanned or image-based."
         )
 
-    # Stable ID based on PDF contents
+    
     document_hash = hashlib.sha256(pdf_bytes).hexdigest()
 
-    # Reuse the shared ingestion pipeline
+    
     chunks_stored = ingest_text(
         text=full_text,
         source=filename,
