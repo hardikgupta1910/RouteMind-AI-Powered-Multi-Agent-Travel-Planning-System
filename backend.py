@@ -24,7 +24,8 @@ from langchain_core.messages import(
 import asyncio
 from langchain_groq import ChatGroq
 # from tools.tavily_tool import tavily_search
-from tools.mcp_test import tavily_mcp_search
+from tools.mcp_client import aviation_mcp_search, tavily_mcp_search
+# from tools.mcp_test import tavily_mcp_search
 from tools.flight_tool import search_flights
 from tools.travel_rag import get_travel_context
 
@@ -43,6 +44,13 @@ def get_db_connection():
         database=os.getenv("DB_NAME")
     )
 
+
+class TravelState(TypedDict):
+    messages:Annotated[list[AnyMessage], operator.add]
+    user_qury:str
+    flight_results:str
+    itinerary: str
+    llm_calls: int
 
 
 GROQ_API_KEY=os.getenv("GROQ_API_KEY")
@@ -67,19 +75,78 @@ class TravelState(TypedDict):
 
 
 
-#Fligtyh Agent
 
-def flight_agent(state:TravelState):
+FLIGHT_AGENT_PROMPT="""
+ you are a travel flight expert
+
+ User Query:
+ {query}
+
+ Airport information:
+ {airport_data}
+
+ Airline information
+ {airline_data}
+
+ Generate:
+
+ 1. Likely departure airport
+ 2. Likely arrival airport
+ 3. Airline serving the routes
+ 4. Typical fligth duration
+ 5. Estimated air fare range
+ 6. peak season price waring
+ 7. booking advice
+
+
+ Return concise travel guidance
+
+"""
+
+def flight_agent(state: TravelState):
+
     query=state["user_query"]
-    flight_data=search_flights(query)
+
+    try:
+        airports=asyncio.run(
+            aviation_mcp_search("list_airports")
+        )
+
+        airlines=asyncio.run(
+            aviation_mcp_search("list_airlines")
+        ) 
+
+        prompt=FLIGHT_AGENT_PROMPT.format(
+            query=query,
+            airports_data=str(airports)[:3000],
+            airlines=str(airlines)[:3000]
+        )
+
+        respone=llm.invoke([
+            SystemMessage(
+                content="You are an expert travel flight planner"
+            ),
+            HumanMessage(content=prompt)
+        ])
+
+        flight_data=respone.content
+
+    except Exception as e:
+
+        flight_data=f"Flight information unavailable:{str(e)}"
 
     return{
         "flight_results":flight_data,
         "messages":[
-            AIMessage(content="Flight results fetched.")
+            AIMessage(
+                content="Flight recommendations generated"
+            )
         ],
-        "llm_calls":state.get("llm_calls",0)+1 
+        "llm_calls":state.get("llm_calls",0)+1
     }
+
+
+
 
 
 #Hotel agent
@@ -96,6 +163,7 @@ def flight_agent(state:TravelState):
 #         ],
 #         "llm_calls":state.get("llm_calls",0)+1 
 #     }
+
 
 def hotel_agent(state: TravelState):
     query = f"Best hotels for {state['user_query']}"
@@ -229,25 +297,6 @@ graph.add_edge("final_agent", END)
 
 
 
-# DB_URI = os.getenv("DB_URI")
-
-# parsed = urlparse(DB_URI)
-
-# conn = pymysql.connect(
-#     host=parsed.hostname,
-#     port=parsed.port or 3306,
-#     user=unquote(parsed.username),
-#     password=unquote(parsed.password),
-#     database=parsed.path.lstrip("/"),
-#     autocommit=True,
-# )
-
-# checkpointer = PyMySQLSaver(conn)
-# checkpointer.setup()
-
-# travel_graph = graph.compile(checkpointer=checkpointer)
-
-
 import pymysql
 from langgraph.checkpoint.mysql.pymysql import PyMySQLSaver
 from urllib.parse import urlparse, unquote
@@ -284,50 +333,10 @@ async def lifespan(app):
 
 # Run Travel Agent
 
-# async def run_travel_agent(user_input: str, thread_id: str | None = None):
-
-#     if not thread_id:
-#         thread_id = f"user_{uuid.uuid4().hex}"
-
-#     config = {
-#         "configurable": {
-#             "thread_id": thread_id
-#         }
-#     }
-
-#     result = await travel_graph.invoke(
-#         {
-#             "messages": [
-#                 HumanMessage(content=user_input)
-#             ],
-#             "user_query": user_input,
-#             "flight_results": "",
-#             "hotel_results": "",
-#             "itinerary": "",
-#             "llm_calls": 0
-#         },
-#         config=config
-#     )
-
-#     final_answer = result["messages"][-1].content
-
-#     return {
-#         "thread_id": thread_id,
-#         "answer": final_answer,
-#         "flight_results": result.get("flight_results", ""),
-#         "hotel_results": result.get("hotel_results", ""),
-#         "itinerary": result.get("itinerary", ""),
-#         "llm_calls": result.get("llm_calls", 0),
-#     }
 
 
-
-
-
-async def run_travel_agent(
-    user_input: str,
-    thread_id: str | None = None
-):
+async def run_travel_agent(user_input: str,thread_id: str | None = None):
+    
     if not thread_id or thread_id == "string":
         thread_id = f"user_{uuid.uuid4().hex}"
 
