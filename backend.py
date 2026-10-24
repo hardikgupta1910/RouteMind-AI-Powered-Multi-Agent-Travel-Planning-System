@@ -23,10 +23,7 @@ from langchain_core.messages import(
 )
 import asyncio
 from langchain_groq import ChatGroq
-# from tools.tavily_tool import tavily_search
-from tools.mcp_client import aviation_mcp_search, tavily_mcp_search
-# from tools.mcp_test import tavily_mcp_search
-from tools.flight_tool import search_flights
+from tools.mcp_client import aviation_mcp_search, tavily_mcp_search,extract_destination,weather_mcp_search,forecast_mcp_search
 from tools.travel_rag import get_travel_context
 
 
@@ -47,8 +44,11 @@ def get_db_connection():
 
 class TravelState(TypedDict):
     messages:Annotated[list[AnyMessage], operator.add]
-    user_qury:str
-    flight_results:str
+    user_query: str
+    flight_results: str
+    hotel_results: str
+    weather_results: str
+    forecast_results: str
     itinerary: str
     llm_calls: int
 
@@ -64,14 +64,6 @@ llm=ChatGroq(
     api_key=GROQ_API_KEY
 )
 
-
-class TravelState(TypedDict):
-    messages:Annotated[list[AnyMessage],operator.add]
-    user_query:str
-    flight_results:str
-    hotel_results:str
-    itinerary:str 
-    llm_calls:int
 
 
 
@@ -151,19 +143,6 @@ def flight_agent(state: TravelState):
 
 #Hotel agent
 
-# async def hotel_agent(state:TravelState):
-#     query=f"Best hotels for {state['user_query']}"
-#     # hotel_results=tavily_search(query)
-#     hotel_results=await tavily_mcp_search(query)
-
-#     return{
-#         "hotel_results":hotel_results,
-#         "messages":[
-#             AIMessage(content="Hotels information fetched.")
-#         ],
-#         "llm_calls":state.get("llm_calls",0)+1 
-#     }
-
 
 def hotel_agent(state: TravelState):
     query = f"Best hotels for {state['user_query']}"
@@ -176,6 +155,32 @@ def hotel_agent(state: TravelState):
             AIMessage(content="Hotels information fetched.")
         ],
         "llm_calls": state.get("llm_calls", 0) + 1
+    }
+
+
+def weather_agent(state:TravelState):
+    city=extract_destination(state["user_query"])
+
+    weather_data=asyncio.run(
+        weather_mcp_search(city)
+    )
+
+    forecast_data=asyncio.run(forecast_mcp_search(city))
+
+    return{
+        "weather_results": F"""
+        Current Weather:
+        {weather_data}
+
+        Forecast:
+        {forecast_data}
+        """,
+        "messages":[
+            AIMessage(
+                content="Weather information fetched"
+            )
+        ]
+
     }
 
 # Itinerary Agent
@@ -198,6 +203,9 @@ Flight Results:
 
 Hotel Results:
 {state['hotel_results']}
+
+Weather results:
+{state['weather_results']}
 
 Travel Guide Knowledge Retrieved from Qdrant:
 {travel_context}
@@ -240,6 +248,9 @@ Flight :
 Hotel :
 {state['hotel_results']}
 
+Weather :
+{state['weather_results']}
+
 Itinerary:
 {state['itinerary']}
 
@@ -247,10 +258,11 @@ Itinerary:
 Format the final answer beautifully using these sections:
 1. Trip summary
 2. Flight information
-3.Hotel suggestions
-4. Day-by-Day itinerary
-5.Estimated Budget
-6. Final Recommendations
+3.Hotel suggestion
+4. weather inforamtion
+5. Day-by-Day itinerary
+6.Estimated Budget
+7. Final Recommendations
 
 Important
 - Be clear and practical.
@@ -282,6 +294,7 @@ graph=StateGraph(TravelState)
 
 graph.add_node("flight_agent",flight_agent)
 graph.add_node("hotel_agent",hotel_agent)
+graph.add_node("weather_agent", weather_agent)
 graph.add_node("itinerary_agent",itinerary_agent)
 graph.add_node("final_agent",final_agent)
 
@@ -290,7 +303,8 @@ graph.add_node("final_agent",final_agent)
 
 graph.add_edge(START,"flight_agent")
 graph.add_edge("flight_agent","hotel_agent")
-graph.add_edge("hotel_agent","itinerary_agent")
+graph.add_edge("hotel_agent","weather_agent")
+graph.add_edge("weather_agent","itinerary_agent")
 graph.add_edge("itinerary_agent","final_agent")
 graph.add_edge("final_agent", END)
 
@@ -351,6 +365,7 @@ async def run_travel_agent(user_input: str,thread_id: str | None = None):
         "user_query": user_input,
         "flight_results": "",
         "hotel_results": "",
+        "weather_results":"",
         "itinerary": "",
         "llm_calls": 0
     }
@@ -368,6 +383,7 @@ async def run_travel_agent(user_input: str,thread_id: str | None = None):
         "answer": final_answer,
         "flight_results": result.get("flight_results", ""),
         "hotel_results": result.get("hotel_results", ""),
+        "weather_results": result.get("weather_results",""),
         "itinerary": result.get("itinerary", ""),
         "llm_calls": result.get("llm_calls", 0)
     }
