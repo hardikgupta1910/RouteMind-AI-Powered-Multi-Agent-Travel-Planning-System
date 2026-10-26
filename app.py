@@ -4,14 +4,19 @@ import uvicorn
 from fastapi import FastAPI, Request, UploadFile, File, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel
-
-from backend import run_travel_agent, lifespan
+import asyncio
+from backend import run_travel_agent, lifespan,lifespan,resume_travel_agent
 from tools.travel_rag import ingest_pdf_bytes, generate_travel_answer
 from exception import (
     TravelAgentException,
     travel_agent_exception_handler
 )
 
+
+class TravelApprovalRequest(BaseModel):
+    thread_id: str
+    approved: bool
+    feedback: str = ""
 
 class RAGQuestion(BaseModel):
     question: str
@@ -59,17 +64,18 @@ async def travel_planner(request_data:TravelRequest):
             thread_id=request_data.thread_id
         )
 
-        return JSONResponse(
-            content={
-                "success":True,
-                "thread_id":result["thread_id"],
-                "answer":result["answer"],
-                "flight_results":result["flight_results"],
-                "hotel_results":result["hotel_results"],
-                "itinerary":result["itinerary"],
-                "llm_calls":result["llm_calls"]
-            }
-        )
+        # return JSONResponse(
+        #     content={
+        #         "success":True,
+        #         "thread_id":result["thread_id"],
+        #         "answer":result["answer"],
+        #         "flight_results":result["flight_results"],
+        #         "hotel_results":result["hotel_results"],
+        #         "itinerary":result["itinerary"],
+        #         "llm_calls":result["llm_calls"]
+        #     }
+        # )
+        return {"success": True, **result}
     except Exception as e:
         print("ERROR: ",e)
         traceback.print_exc()
@@ -120,6 +126,8 @@ async def upload_travel_pdf(file:UploadFile=File(...)):
         )
 
 
+
+
 @app.post("/rag/ask")
 async def ask_travel_questions(request_data: RAGQuestion):
 
@@ -159,7 +167,32 @@ async def ask_travel_questions(request_data: RAGQuestion):
 
 
 
+@app.post("/api/travel/approve")
+async def approve_travel_plan(request_data: TravelApprovalRequest):
+    thread_id = request_data.thread_id.strip()
 
+    if not thread_id:
+        raise HTTPException(
+            status_code=400,
+            detail="thread_id is required.",
+        )
+
+    try:
+        result = await asyncio.to_thread(
+            resume_travel_agent,
+            thread_id=thread_id,
+            approved=request_data.approved,
+            feedback=request_data.feedback,
+        )
+
+        return {"success": True, **result}
+
+    except Exception as exc:
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail=str(exc),
+        ) from exc
 
 
 

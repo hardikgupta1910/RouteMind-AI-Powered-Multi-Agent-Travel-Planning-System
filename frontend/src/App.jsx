@@ -1,1266 +1,756 @@
-
-
-
-
-// function humanizeKey(key) {
-//   return String(key)
-//     .replace(/([a-z])([A-Z])/g, "$1 $2")
-//     .replace(/[_-]/g, " ")
-//     .replace(/\b\w/g, (letter) => letter.toUpperCase());
-// }
-
-// // Clean escaped Markdown characters returned by the AI.
-// function cleanMarkdown(text) {
-//   return String(text ?? "")
-//     .replace(/\r\n/g, "\n")
-//     .replace(/\\([\\`*_{}\[\]()#+.!|>~\-])/g, "$1")
-//     .replace(/^\s*(?:\*\s*){3,}$/gm, "")
-//     .trim();
-// }
-
-// // Render inline Markdown: bold, italic, code and links.
-// function renderInline(text) {
-//   const cleaned = cleanMarkdown(text);
-
-//   const tokenRegex =
-//     /(\*\*[\s\S]+?\*\*|__[\s\S]+?__|\*[^\*\n]+\*|_[^_\n]+_|`[^`]+`|\[[^\]]+\]\(https?:\/\/[^)]+\))/g;
-
-//   return cleaned.split(tokenRegex).map((part, index) => {
-//     // Bold
-//     if (
-//       (part.startsWith("**") && part.endsWith("**")) ||
-//       (part.startsWith("__") && part.endsWith("__"))
-//     ) {
-//       return (
-//         <strong key={index}>
-//           {part.slice(2, -2)}
-//         </strong>
-//       );
-//     }
-
-//     // Italic
-//     if (
-//       (part.startsWith("*") && part.endsWith("*")) ||
-//       (part.startsWith("_") && part.endsWith("_"))
-//     ) {
-//       return (
-//         <em key={index}>
-//           {part.slice(1, -1)}
-//         </em>
-//       );
-//     }
-
-//     // Inline code
-//     if (part.startsWith("`") && part.endsWith("`")) {
-//       return (
-//         <code key={index}>
-//           {part.slice(1, -1)}
-//         </code>
-//       );
-//     }
-
-//     // Links
-//     const link = part.match(/^\[([^\]]+)\]\((https?:\/\/[^)]+)\)$/);
-
-//     if (link) {
-//       return (
-//         <a
-//           key={index}
-//           href={link[2]}
-//           target="_blank"
-//           rel="noopener noreferrer"
-//         >
-//           {link[1]}
-//         </a>
-//       );
-//     }
-
-//     return part;
-//   });
-// }
-
-// function MarkdownContent({ content }) {
-//   const text = cleanMarkdown(content);
-
-//   if (!text) return null;
-
-//   const lines = text.split("\n");
-//   const blocks = [];
-//   let i = 0;
-
-//   // Split a Markdown table row into cells.
-//   function parseTableRow(row) {
-//     return row
-//       .trim()
-//       .replace(/^\|/, "")
-//       .replace(/\|$/, "")
-//       .split("|")
-//       .map((cell) => cell.trim());
-//   }
-
-//   // Detect Markdown table separator rows.
-//   function isTableSeparator(line) {
-//     const cells = parseTableRow(line);
-
-//     return (
-//       cells.length > 0 &&
-//       cells.every((cell) => /^:?-{3,}:?$/.test(cell))
-//     );
-//   }
-
-//   while (i < lines.length) {
-//     const line = lines[i].trim();
-
-//     // Skip empty lines.
-//     if (!line) {
-//       i++;
-//       continue;
-//     }
-
-//     // Headings: # Heading, ## Heading, ### Heading
-//     const heading = line.match(/^(#{1,3})\s+(.+)$/);
-
-//     if (heading) {
-//       const level = heading[1].length;
-//       const HeadingTag = `h${level}`;
-
-//       blocks.push(
-//         <HeadingTag
-//           className="markdown-heading"
-//           key={`heading-${i}`}
-//         >
-//           {renderInline(heading[2])}
-//         </HeadingTag>
-//       );
-
-//       i++;
-//       continue;
-//     }
-
-//     // Markdown tables.
-//     if (
-//       line.includes("|") &&
-//       i + 1 < lines.length &&
-//       isTableSeparator(lines[i + 1].trim())
-//     ) {
-//       const headers = parseTableRow(line);
-//       i += 2;
-
-//       const rows = [];
-
-//       while (
-//         i < lines.length &&
-//         lines[i].trim().includes("|")
-//       ) {
-//         rows.push(parseTableRow(lines[i]));
-//         i++;
-//       }
-
-//       blocks.push(
-//         <div
-//           className="markdown-table-wrap"
-//           key={`table-${blocks.length}`}
-//         >
-//           <table className="markdown-table">
-//             <thead>
-//               <tr>
-//                 {headers.map((header, index) => (
-//                   <th key={index}>
-//                     {renderInline(header)}
-//                   </th>
-//                 ))}
-//               </tr>
-//             </thead>
-
-//             <tbody>
-//               {rows.map((row, rowIndex) => (
-//                 <tr key={rowIndex}>
-//                   {headers.map((_, columnIndex) => (
-//                     <td key={columnIndex}>
-//                       {renderInline(row[columnIndex] || "—")}
-//                     </td>
-//                   ))}
-//                 </tr>
-//               ))}
-//             </tbody>
-//           </table>
-//         </div>
-//       );
-
-//       continue;
-//     }
-
-//     // Horizontal separators: ---, ***, ___
-//     if (/^(?:-{3,}|\*{3,}|_{3,})$/.test(line)) {
-//       blocks.push(
-//         <hr key={`hr-${i}`} />
-//       );
-
-//       i++;
-//       continue;
-//     }
-
-//     // Blockquotes.
-//     if (/^>\s?/.test(line)) {
-//       const quoteLines = [];
-
-//       while (
-//         i < lines.length &&
-//         /^>\s?/.test(lines[i].trim())
-//       ) {
-//         quoteLines.push(
-//           lines[i].trim().replace(/^>\s?/, "")
-//         );
-
-//         i++;
-//       }
-
-//       blocks.push(
-//         <blockquote key={`quote-${blocks.length}`}>
-//           {quoteLines.map((quote, index) => (
-//             <p key={index}>
-//               {renderInline(quote)}
-//             </p>
-//           ))}
-//         </blockquote>
-//       );
-
-//       continue;
-//     }
-
-//     // Ordered and unordered lists.
-//     if (
-//       /^[-*+]\s+/.test(line) ||
-//       /^\d+[.)]\s+/.test(line)
-//     ) {
-//       const ordered = /^\d+[.)]\s+/.test(line);
-//       const items = [];
-
-//       while (
-//         i < lines.length &&
-//         (
-//           /^[-*+]\s+/.test(lines[i].trim()) ||
-//           /^\d+[.)]\s+/.test(lines[i].trim())
-//         )
-//       ) {
-//         items.push(
-//           lines[i]
-//             .trim()
-//             .replace(/^([-*+]|\d+[.)])\s+/, "")
-//         );
-
-//         i++;
-//       }
-
-//       const ListTag = ordered ? "ol" : "ul";
-
-//       blocks.push(
-//         <ListTag
-//           className="markdown-list"
-//           key={`list-${blocks.length}`}
-//         >
-//           {items.map((item, index) => (
-//             <li key={index}>
-//               {renderInline(item)}
-//             </li>
-//           ))}
-//         </ListTag>
-//       );
-
-//       continue;
-//     }
-
-//     // Regular paragraphs.
-//     const paragraph = [line];
-//     i++;
-
-//     while (
-//       i < lines.length &&
-//       lines[i].trim() &&
-//       !/^(#{1,3})\s|^>\s?|^[-*+]\s+|^\d+[.)]\s+/.test(
-//         lines[i].trim()
-//       )
-//     ) {
-//       // Stop if a table begins.
-//       if (
-//         lines[i].includes("|") &&
-//         i + 1 < lines.length &&
-//         isTableSeparator(lines[i + 1].trim())
-//       ) {
-//         break;
-//       }
-
-//       // Stop at a horizontal separator.
-//       if (
-//         /^(?:-{3,}|\*{3,}|_{3,})$/.test(
-//           lines[i].trim()
-//         )
-//       ) {
-//         break;
-//       }
-
-//       paragraph.push(lines[i].trim());
-//       i++;
-//     }
-
-//     blocks.push(
-//       <p
-//         className="markdown-paragraph"
-//         key={`paragraph-${blocks.length}`}
-//       >
-//         {renderInline(paragraph.join(" "))}
-//       </p>
-//     );
-//   }
-
-//   return (
-//     <div className="markdown-content">
-//       {blocks}
-//     </div>
-//   );
-// }
-
-// function ResultValue({ value }) {
-//   if (
-//     value === null ||
-//     value === undefined ||
-//     value === ""
-//   ) {
-//     return null;
-//   }
-
-//   // Markdown strings.
-//   if (typeof value === "string") {
-//     return <MarkdownContent content={value} />;
-//   }
-
-//   // Numbers and booleans.
-//   if (
-//     typeof value === "number" ||
-//     typeof value === "boolean"
-//   ) {
-//     return <span>{String(value)}</span>;
-//   }
-
-//   // Arrays.
-//   if (Array.isArray(value)) {
-//     if (!value.length) return null;
-
-//     return (
-//       <div className="result-list">
-//         {value.map((item, index) => (
-//           <div
-//             className="result-list-item"
-//             key={index}
-//           >
-//             <ResultValue value={item} />
-//           </div>
-//         ))}
-//       </div>
-//     );
-//   }
-
-//   // Objects.
-//   const entries = Object.entries(value).filter(
-//     ([, item]) =>
-//       item !== null &&
-//       item !== undefined &&
-//       item !== ""
-//   );
-
-//   if (!entries.length) return null;
-
-//   return (
-//     <div className="result-fields">
-//       {entries.map(([key, item]) => (
-//         <div
-//           className="result-field"
-//           key={key}
-//         >
-//           <span className="result-field-label">
-//             {humanizeKey(key)}
-//           </span>
-
-//           <div className="result-field-value">
-//             <ResultValue value={item} />
-//           </div>
-//         </div>
-//       ))}
-//     </div>
-//   );
-// }
-
-// function ResultPanel({ title, eyebrow, value, icon }) {
-//   if (
-//     value === null ||
-//     value === undefined ||
-//     value === "" ||
-//     (Array.isArray(value) && value.length === 0)
-//   ) {
-//     return null;
-//   }
-
-//   return (
-//     <article className="structured-result-card">
-//       <div className="structured-result-header">
-//         <span className="structured-result-icon">
-//           {icon}
-//         </span>
-
-//         <div>
-//           <span className="structured-result-eyebrow">
-//             {eyebrow}
-//           </span>
-
-//           <h3>{title}</h3>
-//         </div>
-//       </div>
-
-//       <div className="structured-result-content">
-//         <ResultValue value={value} />
-//       </div>
-//     </article>
-//   );
-// }
-
-
-
 import { useEffect, useRef, useState } from "react";
-import Markdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import "./App.css";
+import { api } from "./api";
 
-const initialForm = {
-  destination: "",
-  origin: "",
-  startDate: "",
-  endDate: "",
-  travelers: "2",
-  budget: "",
-  preferences: "",
+const STORAGE_KEY = "routemind-editorial-v2";
+
+const emptySession = {
+  threadId: null,
+  result: null,
+  request: "",
 };
 
-function buildTravelMessage(form) {
-  return [
-    `Plan a trip to ${form.destination}.`,
-    form.origin && `Starting from ${form.origin}.`,
-    form.startDate && `Departure date: ${form.startDate}.`,
-    form.endDate && `Return date: ${form.endDate}.`,
-    `Number of travelers: ${form.travelers}.`,
-    form.budget && `Total trip budget: ${form.budget}.`,
-    form.preferences && `Travel preferences: ${form.preferences}.`,
-    "Find suitable flights and hotels, then create a practical day-by-day itinerary.",
-  ]
-    .filter(Boolean)
-    .join("\n");
-}
+const starters = [
+  {
+    number: "01",
+    title: "A long weekend",
+    description: "Three days. A new city. Room to wander.",
+    query:
+      "Plan a relaxed 3-day trip from Mumbai to Jaipur under ₹25,000 per person. Include flights, stays, local food, and sightseeing.",
+  },
+  {
+    number: "02",
+    title: "The slower route",
+    description: "Less rushing. More time in each place.",
+    query:
+      "Plan a relaxed 5-day Kerala trip for two people. Prioritize comfortable stays, local food, and a realistic daily schedule.",
+  },
+  {
+    number: "03",
+    title: "Closer to home",
+    description: "A short escape without a complicated plan.",
+    query:
+      "Suggest a budget weekend trip from Bhopal. Include transport, accommodation, local food, and approximate costs.",
+  },
+];
 
-function humanizeKey(key) {
-  return String(key)
-    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
-    .replace(/[_-]/g, " ")
-    .replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
+function readSession() {
+  try {
+    const value = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
 
-function isUsefulValue(value) {
-  if (value === null || value === undefined) return false;
-
-  if (typeof value === "string") {
-    return value.trim().length > 0;
+    if (
+      value &&
+      typeof value.threadId === "string" &&
+      value.result &&
+      typeof value.result === "object"
+    ) {
+      return {
+        threadId: value.threadId,
+        result: value.result,
+        request: typeof value.request === "string" ? value.request : "",
+      };
+    }
+  } catch {
+    // Start fresh if storage is unavailable or invalid.
   }
 
-  if (Array.isArray(value)) {
-    return value.some(isUsefulValue);
-  }
-
-  if (typeof value === "object") {
-    return Object.values(value).some(isUsefulValue);
-  }
-
-  return typeof value === "number" || typeof value === "boolean";
+  return emptySession;
 }
 
-/*
- * Repair common AI-escaped formatting conservatively.
- * Code spans and fenced code blocks remain untouched.
- * Ordinary backslashes and literal escaped pipes remain intact.
- */
-function cleanMarkdown(text) {
-  const source = String(text ?? "").replace(/\r\n?/g, "\n");
+function asText(value) {
+  if (typeof value === "string") return value;
+  if (value == null) return "";
+  return JSON.stringify(value, null, 2);
+}
 
-  const protectedParts = source.split(
-    /(`{3,}[\s\S]*?`{3,}|~{3,}[\s\S]*?~{3,}|`+[^`\n]*`+)/g
-  );
-
-  return protectedParts
-    .map((part, index) => {
-      if (index % 2 === 1) return part;
-
-      let cleaned = part
-        .replace(/\\\*\\\*([^\n]+?)\\\*\\\*/g, "**$1**")
-        .replace(/\\_\\_([^\n]+?)\\_\\_/g, "__$1__")
-        .replace(/\\\*([^*\n]+?)\\\*/g, "*$1*")
-        .replace(/^([ \t]*)\\(#{1,6})(?=\s)/gm, "$1$2")
-        .replace(/^([ \t]*)\\>(?=\s|$)/gm, "$1>")
-        .replace(/^([ \t]*)\\([-+*])(?=\s)/gm, "$1$2");
-
-      /*
-       * Unescape table delimiters only in a contiguous table-shaped
-       * block with an escaped separator row. A literal \| elsewhere
-       * is not changed.
-       */
-      const lines = cleaned.split("\n");
-
-      for (let i = 1; i < lines.length; i += 1) {
-        if (!lines[i].includes("\\|")) continue;
-
-        const separator = lines[i].replace(/\\\|/g, "|").trim();
-
-        if (!/^\|?[ \t]*:?-{3,}:?[ \t]*(\|[ \t]*:?-{3,}:?[ \t]*)+\|?$/.test(separator)) {
-          continue;
-        }
-
-        if (!lines[i - 1].includes("\\|")) continue;
-
-        lines[i - 1] = lines[i - 1].replace(/\\\|/g, "|");
-        lines[i] = separator;
-
-        let row = i + 1;
-
-        while (
-          row < lines.length &&
-          lines[row].trim() &&
-          lines[row].includes("\\|")
-        ) {
-          lines[row] = lines[row].replace(/\\\|/g, "|");
-          row += 1;
-        }
-
-        i = row - 1;
-      }
-
-      cleaned = lines.join("\n");
-      return cleaned;
-    })
-    .join("")
+function cleanText(value) {
+  return asText(value)
+    .replace(/\r\n/g, "\n")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p\s*>/gi, "\n\n")
+    .replace(/<[^>]*>/g, "")
+    .replace(/```[^\n]*\n?/g, "")
+    .replace(/^[ \t]*([-*_])(?:[ \t]*\1){2,}[ \t]*$/gm, "")
+    .replace(/^[ \t]*#{1,6}[ \t]+/gm, "")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/__([^_]+)__/g, "$1")
+    .replace(/\*([^*\n]+)\*/g, "$1")
+    .replace(
+      /\[([^\]]+)\]\((https?:\/\/[^)]+)\)/g,
+      "$1 ($2)"
+    )
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/^[ \t]*[-*][ \t]+/gm, "• ")
+    .replace(/^[ \t]*>[ \t]?/gm, "")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
     .trim();
 }
 
-function safeMarkdownUrl(url) {
-  const value = String(url ?? "").trim();
+const SECTION_HEADINGS = new Set([
+  "trip overview",
+  "overview",
+  "day-by-day itinerary",
+  "estimated budget",
+  "budget",
+  "practical notes",
+  "practical tips",
+  "practical tips & local flavor",
+  "suggested packing list",
+  "packing list",
+  "flight information",
+  "hotel suggestions",
+  "weather information",
+  "final recommendations",
+  "final thought",
+]);
 
-  if (!value) return "";
+function TravelText({ value }) {
+  const text = cleanText(value);
 
-  try {
-    const parsed = new URL(value, window.location.origin);
-
-    if (
-      parsed.protocol === "https:" ||
-      parsed.protocol === "http:" ||
-      parsed.protocol === "mailto:"
-    ) {
-      return value;
-    }
-  } catch {
-    return "";
-  }
-
-  return "";
-}
-
-const markdownComponents = {
-  a: ({ href, title, children }) =>
-    href ? (
-      <a
-        href={href}
-        title={title}
-        target="_blank"
-        rel="noopener noreferrer"
-      >
-        {children}
-      </a>
-    ) : (
-      <span>{children}</span>
-    ),
-
-  // Do not load arbitrary remote images from AI-generated output.
-  img: ({ alt }) => (
-    <span className="markdown-image-label">
-      {alt ? `[Image: ${alt}]` : "[Image omitted]"}
-    </span>
-  ),
-
-  table: ({ children }) => (
-    <div className="markdown-table-wrap">
-      <table className="markdown-table">{children}</table>
-    </div>
-  ),
-};
-
-function MarkdownContent({ content }) {
-  const text = cleanMarkdown(content);
-
-  if (!text) return null;
-
-  return (
-    <div className="markdown-content">
-      <Markdown
-        remarkPlugins={[remarkGfm]}
-        skipHtml
-        urlTransform={safeMarkdownUrl}
-        components={markdownComponents}
-      >
-        {text}
-      </Markdown>
-    </div>
-  );
-}
-
-function ResultValue({ value }) {
-  if (!isUsefulValue(value)) return null;
-
-  if (typeof value === "string") {
-    return <MarkdownContent content={value} />;
-  }
-
-  if (typeof value === "number" || typeof value === "boolean") {
-    return <span>{String(value)}</span>;
-  }
-
-  if (Array.isArray(value)) {
+  if (!text) {
     return (
-      <div className="result-list">
-        {value.map((item, index) =>
-          isUsefulValue(item) ? (
-            <div className="result-list-item" key={index}>
-              <ResultValue value={item} />
-            </div>
-          ) : null
-        )}
-      </div>
+      <p className="quiet">
+        No information returned for this section.
+      </p>
     );
   }
 
-  return (
-    <div className="result-fields">
-      {Object.entries(value)
-        .filter(([, item]) => isUsefulValue(item))
-        .map(([key, item]) => (
-          <div className="result-field" key={key}>
-            <span className="result-field-label">
-              {humanizeKey(key)}
-            </span>
+  const lines = text.split("\n");
 
-            <div className="result-field-value">
-              <ResultValue value={item} />
+  return (
+    <div className="travel-document">
+      {lines.map((rawLine, index) => {
+        const line = rawLine.trim();
+
+        if (!line) return null;
+
+        const headingKey = line
+          .replace(/^\d+[.)]\s*/, "")
+          .replace(/:$/, "")
+          .toLowerCase();
+
+        if (/^day[\s\u00a0\u202f]+\d+\b/i.test(line)) {
+          return (
+            <h3 className="itinerary-day" key={index}>
+              {line}
+            </h3>
+          );
+        }
+
+        if (SECTION_HEADINGS.has(headingKey)) {
+          return (
+            <h3 className="itinerary-heading" key={index}>
+              {line}
+            </h3>
+          );
+        }
+
+        const labeledLine = line.match(
+          /^(Morning|Afternoon|Evening|Stay|Breakfast|Lunch|Dinner|Flights?|Accommodation|Transport|Food|Activities|Total)\s*:\s*(.*)$/i
+        );
+
+        if (labeledLine) {
+          return (
+            <div className="itinerary-row" key={index}>
+              <span className="itinerary-label">
+                {labeledLine[1]}
+              </span>
+              <p>{labeledLine[2]}</p>
             </div>
-          </div>
-        ))}
+          );
+        }
+
+        if (line.startsWith("• ")) {
+          return (
+            <div className="itinerary-bullet" key={index}>
+              <span aria-hidden="true">•</span>
+              <p>{line.slice(2)}</p>
+            </div>
+          );
+        }
+
+        return (
+          <p className="itinerary-paragraph" key={index}>
+            {line}
+          </p>
+        );
+      })}
     </div>
   );
 }
 
-function ResultPanel({ title, eyebrow, value, icon }) {
-  if (!isUsefulValue(value)) return null;
-
+function Spinner({ label }) {
   return (
-    <article className="structured-result-card">
-      <div className="structured-result-header">
-        <span className="structured-result-icon" aria-hidden="true">
-          {icon}
-        </span>
-
-        <div>
-          <span className="structured-result-eyebrow">{eyebrow}</span>
-          <h3>{title}</h3>
-        </div>
-      </div>
-
-      <div className="structured-result-content">
-        <ResultValue value={value} />
-      </div>
-    </article>
+    <span className="loading-inline">
+      <span className="spinner" aria-hidden="true" />
+      {label}
+    </span>
   );
 }
 
-function getApiError(data, status) {
-  const fallback = `Travel planning failed (HTTP ${status}).`;
-
-  if (!data || typeof data !== "object") return fallback;
-
-  if (typeof data.detail === "string" && data.detail.trim()) {
-    return data.detail;
-  }
-
-  if (Array.isArray(data.detail)) {
-    const messages = data.detail.map((item) => {
-      if (typeof item === "string") return item;
-
-      if (item && typeof item === "object") {
-        const location = Array.isArray(item.loc)
-          ? item.loc.join(".")
-          : "";
-
-        const message =
-          typeof item.msg === "string" ? item.msg : JSON.stringify(item);
-
-        return location ? `${location}: ${message}` : message;
-      }
-
-      return String(item);
-    });
-
-    return messages.join("; ") || fallback;
-  }
-
-  if (isUsefulValue(data.detail)) {
-    return JSON.stringify(data.detail);
-  }
-
-  return fallback;
-}
-
-function App() {
-  const [form, setForm] = useState({ ...initialForm });
-  const [result, setResult] = useState(null);
-  const [submittedForm, setSubmittedForm] = useState(null);
-  const [threadId, setThreadId] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
+export default function App() {
+  const [page, setPage] = useState("plan");
+  const [session, setSession] = useState(readSession);
+  const [query, setQuery] = useState("");
+  const [feedback, setFeedback] = useState("");
+  const [section, setSection] = useState("itinerary");
+  const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
+  const [online, setOnline] = useState(null);
+  const [guideQuestion, setGuideQuestion] = useState("");
+  const [guideAnswer, setGuideAnswer] = useState("");
+  const [uploadNotice, setUploadNotice] = useState("");
 
-  const requestRef = useRef(null);
+  const inputRef = useRef(null);
+  const resultRef = useRef(null);
 
-  // Cleanup only: no synchronous state updates inside this effect.
+  const result = session.result;
+  const pending = result?.requires_approval === true;
+  const disabled = Boolean(busy);
+
   useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(session));
+    } catch {
+      // Saving is optional; the current page remains usable.
+    }
+  }, [session]);
+
+  useEffect(() => {
+    let active = true;
+
+    api.health()
+      .then(() => active && setOnline(true))
+      .catch(() => active && setOnline(false));
+
     return () => {
-      const activeRequest = requestRef.current;
-      requestRef.current = null;
-      activeRequest?.abort();
+      active = false;
     };
   }, []);
 
-  function handleChange(event) {
-    const { name, value } = event.target;
+  function acceptResult(data, request = session.request) {
+    setSession({
+      threadId: data.thread_id,
+      result: data,
+      request,
+    });
+    setSection("itinerary");
+    setFeedback("");
 
-    setForm((previous) => ({
-      ...previous,
-      [name]: value,
-    }));
+    requestAnimationFrame(() => {
+      resultRef.current?.scrollIntoView({ behavior: "smooth" });
+    });
   }
 
   function resetTrip() {
-    const activeRequest = requestRef.current;
-
-    // Invalidate the request before aborting so stale responses are ignored.
-    requestRef.current = null;
-    activeRequest?.abort();
-
-    setForm({ ...initialForm });
-    setResult(null);
-    setSubmittedForm(null);
-    setError("");
-    setThreadId("");
-    setIsLoading(false);
-  }
-
-  async function handleSubmit(event) {
-    event.preventDefault();
-
-    // A ref locks immediately, including before React renders loading state.
-    if (requestRef.current) return;
-
-    const nextForm = Object.fromEntries(
-      Object.entries(form).map(([key, value]) => [key, value.trim()])
-    );
-
-    if (!nextForm.destination) {
-      setError("Enter a destination.");
-      return;
-    }
-
-    const travelers = Number(nextForm.travelers);
-
-    if (!Number.isInteger(travelers) || travelers < 1) {
-      setError("The number of travelers must be a positive whole number.");
-      return;
-    }
+    if (disabled) return;
 
     if (
-      nextForm.startDate &&
-      nextForm.endDate &&
-      nextForm.endDate < nextForm.startDate
+      pending &&
+      !window.confirm(
+        "Start a new trip? This clears the displayed draft, not its saved backend checkpoint."
+      )
     ) {
-      setError("The return date cannot be before the departure date.");
       return;
     }
 
-    const controller = new AbortController();
-    requestRef.current = controller;
+    setSession({ ...emptySession });
+    setQuery("");
+    setFeedback("");
+    setError("");
+    setSection("itinerary");
+    setPage("plan");
+  }
 
-    setIsLoading(true);
+  async function plan(event) {
+    event.preventDefault();
+    const message = query.trim();
+    if (!message || disabled || pending) return;
+
+    setBusy("plan");
     setError("");
 
     try {
-      const response = await fetch("/api/travel", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          message: buildTravelMessage(nextForm),
-          thread_id: threadId,
-        }),
-        signal: controller.signal,
-      });
-
-      const responseText = await response.text();
-
-      if (requestRef.current !== controller) return;
-
-      let data = null;
-      let validJson = false;
-
-      try {
-        data = JSON.parse(responseText);
-        validJson = true;
-      } catch {
-        validJson = false;
-      }
-
-      if (!response.ok) {
-        if (validJson) {
-          throw new Error(getApiError(data, response.status));
-        }
-
-        const plainText = responseText.trim();
-        const looksLikeHtml = plainText.startsWith("<");
-
-        throw new Error(
-          plainText && !looksLikeHtml
-            ? `HTTP ${response.status}: ${plainText.slice(0, 500)}`
-            : `Travel planning failed (HTTP ${response.status}). Check the backend and Vite proxy.`
-        );
-      }
-
-      if (!validJson) {
-        throw new Error(
-          "The backend returned an empty or invalid JSON response."
-        );
-      }
-
-      if (!data || typeof data !== "object" || Array.isArray(data)) {
-        throw new Error("The backend response must be a JSON object.");
-      }
-
-      const nextResult = {
-        answer: data.answer ?? null,
-        flight_results: data.flight_results ?? null,
-        hotel_results: data.hotel_results ?? null,
-        itinerary: data.itinerary ?? null,
-        llm_calls: data.llm_calls ?? null,
-      };
-
-      const returnedThreadId = data.thread_id;
-
-      if (
-        typeof returnedThreadId === "string" &&
-        returnedThreadId.trim()
-      ) {
-        setThreadId(returnedThreadId);
-      }
-
-      setResult(nextResult);
-      setSubmittedForm({ ...nextForm });
-    } catch (requestError) {
-      if (requestRef.current !== controller) return;
-      if (requestError?.name === "AbortError") return;
-
-      setError(
-        requestError instanceof Error
-          ? requestError.message
-          : "Unable to plan the trip. Check the backend connection."
-      );
+      const data = await api.plan(message, session.threadId);
+      acceptResult(data, message);
+      setQuery("");
+      setOnline(true);
+    } catch (err) {
+      setError(err.message);
     } finally {
-      if (requestRef.current === controller) {
-        requestRef.current = null;
-        setIsLoading(false);
-      }
+      setBusy("");
     }
   }
 
-  const snapshot = submittedForm ?? form;
+  async function review(approved) {
+    if (!session.threadId || disabled) return;
 
-  const hasUsefulResult =
-    result !== null &&
-    [
-      result.answer,
-      result.flight_results,
-      result.hotel_results,
-      result.itinerary,
-      result.llm_calls,
-    ].some(isUsefulValue);
+    if (!approved && !feedback.trim()) {
+      setError("Describe what you want changed first.");
+      return;
+    }
+
+    setBusy("review");
+    setError("");
+
+    try {
+      const data = await api.review(
+        session.threadId,
+        approved,
+        feedback.trim()
+      );
+      acceptResult(data);
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function upload(event) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+
+    if (!file || disabled) return;
+
+    setError("");
+    setUploadNotice("");
+
+    if (!file.name.toLowerCase().endsWith(".pdf")) {
+      setError("Choose a PDF file.");
+      return;
+    }
+
+    if (file.size > 15 * 1024 * 1024) {
+      setError("The PDF must be 15 MB or smaller.");
+      return;
+    }
+
+    setBusy("upload");
+
+    try {
+      const data = await api.upload(file);
+      setUploadNotice(
+        `${data.filename} added. ${data.chunks_stored} text chunks indexed.`
+      );
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy("");
+    }
+  }
+
+  async function ask(event) {
+    event.preventDefault();
+    const question = guideQuestion.trim();
+    if (!question || disabled) return;
+
+    setBusy("ask");
+    setError("");
+    setGuideAnswer("");
+
+    try {
+      const data = await api.ask(question);
+      setGuideAnswer(asText(data.answer));
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setBusy("");
+    }
+  }
+
+  const tabs = [
+    ["itinerary", "Itinerary"],
+    ["flight_results", "Flights"],
+    ["hotel_results", "Stays"],
+    ["weather_results", "Weather"],
+    ["budget_results", "Budget"],
+  ];
+
+  const displayedText =
+    section === "itinerary"
+      ? result?.itinerary || result?.answer
+      : result?.[section];
+
+  const tripTitle =
+    asText(result?.trip_constraints?.destination).trim() ||
+    "Your next journey";
 
   return (
-    <div className="app-shell">
-      <header className="topbar">
-        <a className="brand" href="#top" aria-label="RouteMind home">
-          <span className="brand-mark" aria-hidden="true">↗</span>
-          RouteMind
-        </a>
+    <div className="site">
+      <header className="site-header">
+        <div className="header-inner">
+          <button
+            className="wordmark"
+            onClick={() => setPage("plan")}
+            aria-label="RouteMind trip planner"
+          >
+            <span className="brand-symbol" aria-hidden="true">↗</span>
+            routemind<span className="brand-period">.</span>
+          </button>
 
-        <div className="topbar-right">
-          <span className="status-dot" aria-hidden="true" />
-          Multi-agent travel planner
+          <nav aria-label="Main navigation">
+            <button
+              className={page === "plan" ? "nav-link selected" : "nav-link"}
+              onClick={() => setPage("plan")}
+            >
+              Trip planner
+            </button>
+            <button
+              className={page === "guides" ? "nav-link selected" : "nav-link"}
+              onClick={() => setPage("guides")}
+            >
+              Travel guides
+            </button>
+          </nav>
+
+          <button
+            className="header-action"
+            onClick={resetTrip}
+            disabled={disabled}
+          >
+            New trip <span aria-hidden="true">↗</span>
+          </button>
         </div>
       </header>
 
-      <main id="top">
-        <section className="hero">
-          <div className="hero-copy">
-            <div className="eyebrow">
-              <span className="eyebrow-line" aria-hidden="true" />
-              YOUR NEXT JOURNEY, THOUGHTFULLY PLANNED
-            </div>
+      {error && (
+        <div className="error-strip" role="alert">
+          <span>{error}</span>
+          <button aria-label="Dismiss error" onClick={() => setError("")}>
+            ×
+          </button>
+        </div>
+      )}
 
-            <h1>
-              Travel further.
-              <br />
-              <span>Plan smarter.</span>
-            </h1>
-
-            <p className="hero-description">
-              Tell us where you want to go. RouteMind brings together
-              flight research, hotel options, and a practical itinerary
-              in one travel plan.
-            </p>
-
-            <div className="hero-footnote">
-              <span className="hero-star" aria-hidden="true">✦</span>
-              Your preferences. One coordinated travel team.
-            </div>
-          </div>
-
-          <div className="hero-art" aria-hidden="true">
-            <div className="art-sun" />
-            <div className="art-circle art-circle-one" />
-            <div className="art-circle art-circle-two" />
-
-            <div className="art-card art-card-top">
-              <span className="art-card-label">LESS PLANNING. MORE LIVING.</span>
-              <strong>
-                A world
-                <br />
-                of possibilities.
-              </strong>
-              <span className="art-card-arrow">↗</span>
-            </div>
-
-            <div className="art-route">
-              <span className="route-point route-point-start" />
-              <span className="route-point route-point-end" />
-            </div>
-
-            <div className="art-stamp">
-              EXPLORE WITH INTENTION
-              <br />
-              TRAVEL WITH ROUTEMIND
-            </div>
-          </div>
-        </section>
-
-        <section className="planner-section" id="planner">
-          <div className="section-heading">
-            <div>
-              <span className="section-kicker">START WITH THE DETAILS</span>
-              <h2>Where are we headed?</h2>
-            </div>
-
-            <span className="step-label">YOUR JOURNEY STARTS HERE</span>
-          </div>
-
-          <form
-            className="planner-form"
-            onSubmit={handleSubmit}
-            aria-busy={isLoading}
-          >
-            <fieldset className="form-fieldset" disabled={isLoading}>
-              <div className="form-grid">
-                <div className="field">
-                  <label htmlFor="destination">Destination *</label>
-                  <input
-                    id="destination"
-                    name="destination"
-                    value={form.destination}
-                    onChange={handleChange}
-                    placeholder="Tokyo, Japan"
-                    required
-                  />
+      <main>
+        {page === "plan" ? (
+          <>
+            {!result && (
+              <section className="hero page-width">
+                <div className="hero-copy">
+                  <p className="kicker">GO SOMEWHERE GOOD.</p>
+                  <h1>
+                    A little less planning.
+                    <br />
+                    <span>A lot more going.</span>
+                  </h1>
+                  <p className="hero-description">
+                    The right places, a realistic budget, and a plan that
+                    leaves room for the unexpected.
+                  </p>
                 </div>
 
-                <div className="field">
-                  <label htmlFor="origin">Starting location</label>
-                  <input
-                    id="origin"
-                    name="origin"
-                    value={form.origin}
-                    onChange={handleChange}
-                    placeholder="Delhi, India"
-                  />
+                <div className="route-art" aria-hidden="true">
+                  <div className="art-grid" />
+                  <div className="art-circle circle-one" />
+                  <div className="art-circle circle-two" />
+                  <div className="route-track" />
+                  <span className="art-point point-start" />
+                  <span className="art-point point-end" />
+                  <span className="art-label label-start">YOUR EVERYDAY</span>
+                  <span className="art-label label-end">SOMEWHERE ELSE</span>
+                  <span className="art-arrow">↗</span>
+                  <span className="art-caption">TAKE THE SCENIC ROUTE / 001</span>
                 </div>
-
-                <div className="field">
-                  <label htmlFor="startDate">Departure date</label>
-                  <input
-                    id="startDate"
-                    name="startDate"
-                    type="date"
-                    value={form.startDate}
-                    onChange={handleChange}
-                  />
-                </div>
-
-                <div className="field">
-                  <label htmlFor="endDate">Return date</label>
-                  <input
-                    id="endDate"
-                    name="endDate"
-                    type="date"
-                    min={form.startDate || undefined}
-                    value={form.endDate}
-                    onChange={handleChange}
-                  />
-                </div>
-
-                <div className="field">
-                  <label htmlFor="travelers">Number of travelers</label>
-                  <input
-                    id="travelers"
-                    name="travelers"
-                    type="number"
-                    min="1"
-                    step="1"
-                    value={form.travelers}
-                    onChange={handleChange}
-                    required
-                  />
-                </div>
-
-                <div className="field">
-                  <label htmlFor="budget">Total budget</label>
-                  <input
-                    id="budget"
-                    name="budget"
-                    value={form.budget}
-                    onChange={handleChange}
-                    placeholder="INR 150,000 for the entire trip"
-                  />
-                </div>
-
-                <div className="field field-wide">
-                  <label htmlFor="preferences">Travel preferences</label>
-                  <textarea
-                    id="preferences"
-                    name="preferences"
-                    rows={4}
-                    value={form.preferences}
-                    onChange={handleChange}
-                    placeholder="Food preferences, interests, hotel style, transport, accessibility needs..."
-                  />
-                </div>
-              </div>
-            </fieldset>
-
-            {error && (
-              <div className="error-message" role="alert">
-                <span aria-hidden="true">!</span>
-                <div>{error}</div>
-              </div>
+              </section>
             )}
 
-            <div className="form-footer">
-              <p>
-                <span className="privacy-symbol" aria-hidden="true">✦</span>
-                One request. A coordinated flight, hotel, and itinerary plan.
-              </p>
-
-              <div className="form-buttons">
-                <button
-                  className="reset-button"
-                  type="button"
-                  onClick={resetTrip}
-                >
-                  {isLoading ? "Cancel & reset" : "Reset"}
-                </button>
-
-                <button
-                  className="plan-button"
-                  type="submit"
-                  disabled={isLoading}
-                >
-                  {isLoading ? "Planning your trip" : "Plan my trip"}
-                  {isLoading ? (
-                    <span className="loading-spinner" aria-hidden="true" />
-                  ) : (
-                    <span className="button-arrow" aria-hidden="true">↗</span>
-                  )}
-                </button>
+            <section className={`page-width planning-area ${result ? "compact" : ""}`}>
+              <div className="planning-heading">
+                <div>
+                  <p className="kicker">THE STARTING POINT</p>
+                  <h2>{result ? "Keep shaping your trip." : "What do you have in mind?"}</h2>
+                </div>
+                <span className="planning-hint">
+                  Destination. Dates. Budget. Your kind of trip.
+                </span>
               </div>
-            </div>
-          </form>
-        </section>
 
-        {isLoading && (
-          <section className="loading-panel" role="status" aria-live="polite">
-            <span className="loading-orbit" aria-hidden="true">✦</span>
-            <h2>Your travel team is on it.</h2>
-            <p>
-              Researching flights, exploring hotels, and building your itinerary.
-            </p>
-            <div className="loading-bar" aria-hidden="true">
-              <span />
-            </div>
-          </section>
-        )}
+              <form className="trip-form" onSubmit={plan}>
+                <label className="sr-only" htmlFor="trip-input">
+                  Describe the trip you want to plan
+                </label>
 
-        {result !== null && !isLoading && (
-          <section className="result-section" id="results">
-            <div className="result-heading">
-              <div>
-                <span className="section-kicker">YOUR JOURNEY, ORGANIZED</span>
-                <h2>Your travel plan</h2>
-                <p className="result-subtitle">
-                  Flight options, places to stay, and a day-by-day plan
-                  from your travel team.
+                <textarea
+                  id="trip-input"
+                  ref={inputRef}
+                  value={query}
+                  onChange={(event) => setQuery(event.target.value)}
+                  disabled={disabled || pending}
+                  placeholder={
+                    pending
+                      ? "Review your draft below before sending another request."
+                      : "A 3-day trip from Mumbai to Jaipur, under ₹25,000 per person. Good food, a comfortable stay, and no rushed mornings."
+                  }
+                  rows={3}
+                />
+
+                <div className="form-bottom">
+                  <span className="form-note">
+                    No bookings. Just a considered plan.
+                  </span>
+                  <button
+                    className="button button-dark"
+                    type="submit"
+                    disabled={disabled || pending || !query.trim()}
+                  >
+                    {busy === "plan" ? (
+                      <Spinner label="Planning your trip" />
+                    ) : (
+                      <>Create itinerary <span aria-hidden="true">↗</span></>
+                    )}
+                  </button>
+                </div>
+              </form>
+
+              {busy === "plan" && (
+                <p className="operation-note" role="status">
+                  Researching your request. The itinerary appears when the
+                  backend completes its work—there is no live progress feed.
                 </p>
-              </div>
+              )}
+            </section>
 
-              <button
-                className="reset-button"
-                type="button"
-                onClick={resetTrip}
-              >
-                Start a new trip ↗
-              </button>
-            </div>
+            {!result && (
+              <section className="page-width inspiration">
+                <div className="section-rule">
+                  <span>NEED A STARTING POINT?</span>
+                  <span>THREE WAYS TO GET AWAY</span>
+                </div>
 
-            <div className="result-dashboard">
-              <div className="result-main-column">
-                {!hasUsefulResult && (
-                  <div className="empty-result" role="status">
-                    The backend returned no travel details. Adjust your
-                    request and try again.
+                <div className="starter-grid">
+                  {starters.map((item) => (
+                    <button
+                      className="starter"
+                      key={item.number}
+                      disabled={disabled}
+                      onClick={() => {
+                        setQuery(item.query);
+                        inputRef.current?.focus();
+                      }}
+                    >
+                      <span className="starter-top">
+                        <span>{item.number}</span>
+                        <span aria-hidden="true">↗</span>
+                      </span>
+                      <h3>{item.title}</h3>
+                      <p>{item.description}</p>
+                    </button>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {result && (
+              <section className="page-width result-section" ref={resultRef}>
+                <div className="result-topline">
+                  <p className="kicker">YOUR TRAVEL NOTES</p>
+                  <span className={`result-status ${pending ? "pending" : ""}`}>
+                    <span />
+                    {pending
+                      ? "Draft · awaiting review"
+                      : result.guardrail_allowed === false
+                        ? "Request not supported"
+                        : "Plan generated"}
+                  </span>
+                </div>
+
+                <h2 className="trip-title">{tripTitle}</h2>
+                <p className="request-caption">{session.request}</p>
+
+                <div className="trip-facts">
+                  {[
+                    ["From", result.trip_constraints?.origin],
+                    ["Duration", result.trip_constraints?.duration],
+                    ["Budget", result.trip_constraints?.budget],
+                    ["Travel style", result.trip_constraints?.travel_style],
+                  ]
+                    .filter(([, value]) => Boolean(value))
+                    .map(([label, value]) => (
+                      <div key={label}>
+                        <span>{label}</span>
+                        <p>{asText(value)}</p>
+                      </div>
+                    ))}
+                </div>
+
+                <div className="document-layout">
+                  <aside className="document-nav" aria-label="Trip sections">
+                    <span className="document-nav-title">IN THIS PLAN</span>
+                    {tabs.map(([key, label], index) => (
+                      <button
+                        key={key}
+                        className={section === key ? "document-tab active" : "document-tab"}
+                        onClick={() => setSection(key)}
+                        aria-pressed={section === key}
+                      >
+                        <span className="tab-number">0{index + 1}</span>
+                        {label}
+                        <span className="tab-arrow" aria-hidden="true">↗</span>
+                      </button>
+                    ))}
+                    <p className="document-nav-note">
+                      Estimates are not quotes. Confirm details before booking.
+                    </p>
+                  </aside>
+
+                  <div className="document-content">
+                    <div className="document-section-title">
+                      <h3>{tabs.find(([key]) => key === section)?.[1]}</h3>
+                      <span>ROUTEMIND / TRAVEL NOTES</span>
+                    </div>
+
+                    <TravelText value={displayedText} />
+
+                    {pending && (
+                      <section className="review-box">
+                        <p className="kicker">A QUICK CHECK BEFORE YOU GO</p>
+                        <h3>Does this feel like your trip?</h3>
+                        <p>
+                          Approve the draft, or tell us what needs changing.
+                        </p>
+
+                        <label htmlFor="feedback">Anything to adjust?</label>
+                        <textarea
+                          id="feedback"
+                          value={feedback}
+                          onChange={(event) => setFeedback(event.target.value)}
+                          placeholder="Less sightseeing on day two. A lower hotel budget. More time for local food."
+                          rows={3}
+                          disabled={disabled}
+                        />
+
+                        <div className="review-actions">
+                          <button
+                            className="button button-dark"
+                            onClick={() => review(true)}
+                            disabled={disabled}
+                          >
+                            {busy === "review" ? (
+                              <Spinner label="Updating plan" />
+                            ) : (
+                              <>Approve itinerary <span aria-hidden="true">↗</span></>
+                            )}
+                          </button>
+                          <button
+                            className="button button-outline"
+                            onClick={() => review(false)}
+                            disabled={disabled || !feedback.trim()}
+                          >
+                            Revise & finalize
+                          </button>
+                        </div>
+
+                        <small>
+                          Revisions are finalized directly by your current
+                          backend, without a second review.
+                        </small>
+                      </section>
+                    )}
                   </div>
+                </div>
+              </section>
+            )}
+          </>
+        ) : (
+          <section className="page-width guides-page">
+            <p className="kicker">BRING YOUR OWN KNOWLEDGE</p>
+            <h1>
+              Good guides.
+              <br />
+              <span>Better questions.</span>
+            </h1>
+            <p className="hero-description">
+              Add a travel PDF, then ask for the details that matter to you.
+            </p>
+
+            <div className="guides-layout">
+              <section className="upload-section">
+                <span className="section-index">01 / BUILD YOUR LIBRARY</span>
+                <h2>A guide worth keeping.</h2>
+                <p>
+                  Upload a destination guide or travel document.
+                  PDF files up to 15 MB.
+                </p>
+
+                <label className="upload-control">
+                  <span className="upload-symbol" aria-hidden="true">↑</span>
+                  <span>
+                    {busy === "upload" ? "Uploading and indexing…" : "Choose a PDF"}
+                  </span>
+                  <input
+                    type="file"
+                    accept=".pdf,application/pdf"
+                    onChange={upload}
+                    disabled={disabled}
+                  />
+                </label>
+
+                {uploadNotice && (
+                  <p className="upload-success" role="status">{uploadNotice}</p>
                 )}
 
-                <ResultPanel
-                  title="Flight Results"
-                  eyebrow="GETTING THERE"
-                  icon="✈"
-                  value={result.flight_results}
-                />
+                <small>
+                  Documents are added to the backend’s shared knowledge base.
+                  This is not private document storage.
+                </small>
+              </section>
 
-                <ResultPanel
-                  title="Hotel Results"
-                  eyebrow="YOUR PLACE TO STAY"
-                  icon="⌂"
-                  value={result.hotel_results}
-                />
+              <section className="question-section">
+                <span className="section-index">02 / FIND WHAT MATTERS</span>
+                <h2>Ask something specific.</h2>
 
-                <ResultPanel
-                  title="Day-by-Day Itinerary"
-                  eyebrow="MAKE THE MOST OF EVERY DAY"
-                  icon="▦"
-                  value={result.itinerary}
-                />
-
-                <ResultPanel
-                  title="Travel Team Notes"
-                  eyebrow="THE COMPLETE PICTURE"
-                  icon="✦"
-                  value={result.answer}
-                />
-              </div>
-
-              <aside className="result-side-column">
-                <section className="result-side-card">
-                  <span className="result-side-kicker">AT A GLANCE</span>
-                  <h3>Trip Snapshot</h3>
-
-                  <div className="snapshot-row">
-                    <span>Destination</span>
-                    <strong>{snapshot.destination || "Not specified"}</strong>
-                  </div>
-
-                  <div className="snapshot-row">
-                    <span>Starting from</span>
-                    <strong>{snapshot.origin || "Not specified"}</strong>
-                  </div>
-
-                  <div className="snapshot-row">
-                    <span>Departure</span>
-                    <strong>{snapshot.startDate || "Flexible"}</strong>
-                  </div>
-
-                  <div className="snapshot-row">
-                    <span>Return</span>
-                    <strong>{snapshot.endDate || "Flexible"}</strong>
-                  </div>
-
-                  <div className="snapshot-row">
-                    <span>Travelers</span>
-                    <strong>{snapshot.travelers}</strong>
-                  </div>
-
-                  <div className="snapshot-row">
-                    <span>Total budget</span>
-                    <strong>{snapshot.budget || "Not specified"}</strong>
-                  </div>
-
-                  {snapshot.preferences && (
-                    <div className="snapshot-row">
-                      <span>Preferences</span>
-                      <strong>{snapshot.preferences}</strong>
-                    </div>
-                  )}
-
-                  {threadId && (
-                    <div className="snapshot-row">
-                      <span>Thread ID</span>
-                      <strong className="thread-id">{threadId}</strong>
-                    </div>
-                  )}
-
-                  <p className="snapshot-note">
-                    Verify prices, availability, and travel requirements
-                    before booking. AI-generated plans are not reservations.
-                  </p>
-                </section>
-
-                {isUsefulValue(result.llm_calls) && (
-                  <section className="result-side-card agent-card">
-                    <span className="result-side-kicker">BEHIND THE PLAN</span>
-                    <h3>Agent Activity</h3>
-                    <div className="structured-result-content">
-                      <ResultValue value={result.llm_calls} />
-                    </div>
-                  </section>
-                )}
-              </aside>
+                <form onSubmit={ask}>
+                  <label htmlFor="guide-question">Your question</label>
+                  <textarea
+                    id="guide-question"
+                    value={guideQuestion}
+                    onChange={(event) => setGuideQuestion(event.target.value)}
+                    placeholder="What does the guide suggest for a relaxed two-day visit?"
+                    rows={5}
+                    disabled={disabled}
+                  />
+                  <button
+                    className="button button-dark"
+                    type="submit"
+                    disabled={disabled || !guideQuestion.trim()}
+                  >
+                    {busy === "ask" ? (
+                      <Spinner label="Reading your guides" />
+                    ) : (
+                      <>Find an answer <span aria-hidden="true">↗</span></>
+                    )}
+                  </button>
+                </form>
+              </section>
             </div>
+
+            {guideAnswer && (
+              <section className="guide-answer">
+                <p className="kicker">FROM YOUR KNOWLEDGE BASE</p>
+                <TravelText value={guideAnswer} />
+              </section>
+            )}
           </section>
         )}
       </main>
 
-      <footer className="site-footer">
-        <a className="footer-brand" href="#top">
-          <span aria-hidden="true">↗</span>
-          RouteMind
-        </a>
-        <p>AI-Powered Multi-Agent Travel Planning System</p>
-        <span className="footer-year">PLAN THOUGHTFULLY. EXPLORE FREELY.</span>
+      <footer className="site-footer page-width">
+        <span>RouteMind — make room for the journey.</span>
+        <span className="connection-label">
+          <span
+            className={`connection-dot ${
+              online === true ? "online" : online === false ? "offline" : ""
+            }`}
+          />
+          {online === null
+            ? "Checking connection"
+            : online
+              ? "Backend connected"
+              : "Backend unavailable"}
+        </span>
       </footer>
     </div>
   );
 }
-
-export default App;

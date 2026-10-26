@@ -101,67 +101,30 @@ async def tavily_mcp_search(query:str):
     return result
 
 
-async def aviation_mcp_search(tool_name:str, tools_args:dict=None):
-    tools=await client.get_tools()
+async def aviation_mcp_search(
+    tool_name: str,
+    arguments: dict | None = None,
+):
+    tools = await client.get_tools()
 
-    tool=next(
-        t for t in tools
-        if t.name==tool_name
+    tool = next(
+        (item for item in tools if item.name == tool_name),
+        None,
     )
-    result=await search_tool.ainvoke(
-        tools_args or {}
+
+    if tool is None:
+        available = ", ".join(item.name for item in tools)
+        raise RuntimeError(
+            f"MCP tool '{tool_name}' was not found. "
+            f"Available tools: {available}"
+        )
+
+    print(f"Invoking aviation tool: {tool.name}")
+    print(f"Expected arguments: {tool.args}")
+
+    return await tool.ainvoke(
+        arguments if arguments is not None else {}
     )
-
-    return result
-
-
-# weather_tool=None
-# forecast_tool=None
-
-
-# async def initialize_weather_tools():
-
-#     global weather_tool, forecast_tool
-
-#     if weather_tool is not None:
-#         return
-
-#     tools=await client.get_tools()
-
-#     weather_tool=next(
-#         t for t in tools
-
-#         if t.name=="get_current_weather"
-#     )
-
-#     forecast_tool=next(
-#         t for t in tools
-        
-#         if t.name=="get_forecast"
-
-#     )
-
-
-
-# async def weather_mcp_search(city:str):
-
-#     await initialize_weather_tools()
-
-#     return await weather_tool.ainvoke(
-#         {
-#             "city":city
-#         }
-#     )
-
-# async def forecast_mcp_search(city:str):
-
-#     await initialize_weather_tools()
-
-#     return await forecast_tool.ainvoke(
-#         {
-#             "city":city
-#         }
-#     )
 
 weather_tool = None
 forecast_tool = None
