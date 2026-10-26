@@ -1,16 +1,16 @@
 
 # RouteMind — AI-Powered Multi-Agent Travel Planning System
 
-RouteMind is an AI-powered travel planning application that uses specialized agents to generate personalized itineraries based on user preferences, budget, and travel requirements. It combines multi-agent orchestration, external search tools, and Retrieval-Augmented Generation (RAG) to provide context-aware travel recommendations.
+RouteMind is an AI-powered travel planning application that generates personalized itineraries based on user preferences, budget, and travel requirements. It combines multi-agent orchestration, external tool integration, and Retrieval-Augmented Generation (RAG) to provide context-aware travel recommendations.
 
 ## Features
 
-- **Multi-Agent Workflow:** Uses LangGraph to coordinate agents for flight guidance, hotel research, weather information, budget estimation, and itinerary generation.
-- **Intelligent Routing:** A supervisor evaluates travel requests and selects the appropriate agents.
+- **Multi-Agent Workflow:** Uses LangGraph to coordinate specialized agents for flight guidance, hotel research, weather information, budget estimation, and itinerary generation.
+- **Intelligent Routing:** A supervisor evaluates travel requests and routes them to the appropriate agents.
 - **Human-in-the-Loop:** Allows users to review itineraries, approve drafts, or provide revision feedback before generating the final response.
 - **RAG-Based Travel Assistance:** Supports PDF uploads and retrieves relevant information using Qdrant for document-grounded answers and itinerary planning.
 - **Persistent State Management:** Uses MySQL checkpointing to preserve graph execution state and resume interrupted workflows.
-- **Interactive Frontend:** Provides a React interface for trip planning, itinerary review, and travel-guide Q&A.
+- **Interactive Frontend:** Provides a React interface for trip planning, itinerary review, and travel-guide question answering.
 
 ## Tech Stack
 
@@ -34,7 +34,7 @@ React Frontend
    FastAPI
       |
       v
-Travel Supervisor
+LangGraph Supervisor
       |
       v
 Specialized Agents
@@ -60,15 +60,81 @@ Specialized Agents
 MySQL → Persistent Graph Checkpoints
 ```
 
+## Workflow
+
+```mermaid
+flowchart TD
+    A[React Frontend] --> B[FastAPI Backend]
+    B --> C[LangGraph Supervisor]
+
+    C --> D[Flight Agent]
+    C --> E[Hotel Agent]
+    C --> F[Weather Agent]
+    C --> G[Budget Agent]
+
+    D --> H[Itinerary Agent]
+    E --> H
+    F --> H
+    G --> H
+
+    I[External MCP Tools] --> D
+    I --> E
+    I --> F
+
+    J[PDF Travel Guides] --> K[Text Processing and Embeddings]
+    K --> L[(Qdrant Vector Database)]
+    L --> H
+
+    H --> M[Draft Itinerary]
+    M --> N{Human Review}
+    N -->|Approve| O[Final Response]
+    N -->|Revise| O
+
+    P[(MySQL Checkpointer)] -.-> C
+    P -.-> N
+```
+
 ## How It Works
 
 1. The user submits a natural-language travel request through the React frontend.
 2. FastAPI forwards the request to the LangGraph workflow.
 3. The supervisor evaluates the request and routes it to the relevant specialist agents.
 4. The agents gather available travel information, estimate costs, and contribute to itinerary generation.
-5. The RAG module retrieves relevant information from uploaded travel guides.
-6. The application presents a draft itinerary for human review.
-7. The workflow resumes using the saved thread state to generate the final response after approval or revision feedback.
+5. The RAG module retrieves relevant context from uploaded travel guides.
+6. The itinerary agent generates a draft using the available travel information and retrieved context.
+7. The application pauses for human review.
+8. The user approves the draft or provides revision feedback.
+9. The graph resumes using the saved thread state and generates the final response.
+
+## Project Structure
+
+```text
+RouteMind/
+├── app.py
+├── backend.py
+├── exception.py
+├── tools/
+│   ├── mcp_client.py
+│   └── travel_rag.py
+├── frontend/
+│   ├── src/
+│   │   ├── App.jsx
+│   │   ├── main.jsx
+│   │   └── api.js
+│   ├── package.json
+│   └── vite.config.js
+├── requirements.txt
+└── README.md
+```
+
+## RAG Pipeline
+
+1. **Document Ingestion:** Accept travel-guide PDFs for processing.
+2. **Text Processing:** Extract text and split it into smaller chunks.
+3. **Embedding Generation:** Generate vector embeddings using Ollama.
+4. **Vector Storage:** Store document chunks and embeddings in Qdrant.
+5. **Context Retrieval:** Retrieve relevant chunks based on the user's query.
+6. **Context-Aware Generation:** Use retrieved information to answer travel questions and support itinerary planning.
 
 ## Getting Started
 
@@ -79,7 +145,7 @@ MySQL → Persistent Graph Checkpoints
 - MySQL
 - Qdrant
 - Groq API key
-- Credentials and access for configured MCP servers
+- Credentials and access for the configured MCP servers
 
 ### 1. Clone the Repository
 
@@ -102,7 +168,7 @@ Activate it on Windows:
 .venv\Scripts\Activate.ps1
 ```
 
-Install the backend dependencies:
+Install the dependencies:
 
 ```bash
 pip install -r requirements.txt
@@ -117,7 +183,9 @@ GROQ_API_KEY=your_groq_api_key
 DB_URI=mysql://your_user:your_password@127.0.0.1:3306/routemind
 ```
 
-Configure any additional environment variables required by the MCP client and RAG modules. Ensure MySQL, Qdrant, and the required MCP services are running and accessible.
+Configure any additional environment variables required by the MCP client and RAG modules.
+
+Ensure that MySQL, Qdrant, and the required MCP services are running and accessible.
 
 ### 4. Run the Backend
 
@@ -127,8 +195,8 @@ From the project root:
 python -m uvicorn app:app --reload
 ```
 
-- API: `http://127.0.0.1:8000`
-- Swagger UI: `http://127.0.0.1:8000/docs`
+- **API:** http://127.0.0.1:8000
+- **Swagger UI:** http://127.0.0.1:8000/docs
 
 ### 5. Run the Frontend
 
@@ -140,7 +208,9 @@ npm install
 npm run dev
 ```
 
-Open the local URL displayed by Vite, typically `http://localhost:5173`.
+Open the local URL displayed by Vite, typically:
+
+http://localhost:5173
 
 ## API Endpoints
 
@@ -160,6 +230,7 @@ Open the local URL displayed by Vite, typically `http://localhost:5173`.
 - Retrieval-Augmented Generation for document-grounded responses
 - External tool integration through MCP
 - REST API development using FastAPI
+- Vector search and embedding-based document retrieval
 - Separation of frontend, backend, and retrieval components
 
 ## Limitations
@@ -168,6 +239,7 @@ Open the local URL displayed by Vite, typically `http://localhost:5173`.
 - Flight and accommodation information depends on configured tools and available search results.
 - Budget estimates and generated recommendations should be independently verified.
 - Thread identifiers and workflow approval are not substitutes for authentication or authorization.
+- Forecast availability depends on the capabilities of the configured weather service.
 
 ## Future Improvements
 
@@ -175,7 +247,8 @@ Open the local URL displayed by Vite, typically `http://localhost:5173`.
 - Add authentication and user-specific document access.
 - Introduce automated tests for agent routing, API behavior, and RAG retrieval.
 - Add structured itinerary responses and real-time workflow progress.
+- Improve clarification handling for incomplete travel requests.
 
 ---
 
-**RouteMind demonstrates practical experience with AI agents, LangGraph, RAG, external tool integration, persistent workflows, and full-stack application development.**
+**RouteMind demonstrates practical experience with multi-agent AI systems, LangGraph, RAG, MCP integrations, persistent workflows, and full-stack application development.**
